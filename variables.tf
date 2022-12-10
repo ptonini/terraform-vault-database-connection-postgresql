@@ -8,8 +8,12 @@ variable "verify_connection" {
   default = true
 }
 
+variable "ssl_mode" {
+  default = "require"
+}
+
 variable "allowed_roles" {
-  type = list(string)
+  type    = list(string)
   default = null
 }
 
@@ -20,8 +24,6 @@ variable "role_name_prefix" {
 variable "login_name_suffix" {
   default = ""
 }
-
-variable "vault_token" {}
 
 variable "skip_reassign_owned" {
   default = true

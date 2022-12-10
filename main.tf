@@ -4,11 +4,11 @@ resource "random_password" "this" {
 }
 
 resource "postgresql_role" "this" {
-  provider = postgresql
-  name = "${var.role_name_prefix}-${var.database}"
-  login = true
-  password = random_password.this.result
-  create_role = true
+  provider            = postgresql
+  name                = "${var.role_name_prefix}-${var.database}"
+  login               = true
+  password            = random_password.this.result
+  create_role         = true
   skip_reassign_owned = var.skip_reassign_owned
   roles = [
     "postgres"
@@ -17,15 +17,15 @@ resource "postgresql_role" "this" {
 }
 
 resource "vault_database_secret_backend_connection" "this" {
-  name = var.database
-  backend = try(var.backend.path, var.backend)
+  name              = var.database
+  backend           = try(var.backend.path, var.backend)
   verify_connection = var.verify_connection
   root_rotation_statements = [
     "ALTER ROLE \"${postgresql_role.this.name}\" WITH PASSWORD '{{password}}';"
   ]
   postgresql {
-    connection_url = "postgres://{{username}}:{{password}}@${var.host}/${var.database}?sslmode=require"
-    username = "${postgresql_role.this.name}${var.login_name_suffix}"
+    connection_url = "postgres://{{username}}:{{password}}@${var.host}/${var.database}?sslmode=${var.ssl_mode}"
+    username       = "${postgresql_role.this.name}${var.login_name_suffix}"
   }
   data = {
     username = "${postgresql_role.this.name}${var.login_name_suffix}"
@@ -39,13 +39,12 @@ resource "vault_database_secret_backend_connection" "this" {
   }
 }
 
-resource "null_resource" "rotate_role_password" {
-  triggers = {
-    password = vault_database_secret_backend_connection.this.data.password
-  }
-  provisioner "local-exec" {
-    command = "VAULT_TOKEN=${var.vault_token} vault write -force ${vault_database_secret_backend_connection.this.backend}/rotate-root/${vault_database_secret_backend_connection.this.name}"
-  }
+resource "vault_generic_endpoint" "rotate_root" {
+  path                 = "${vault_database_secret_backend_connection.this.backend}/rotate-root/${vault_database_secret_backend_connection.this.name}"
+  ignore_absent_fields = true
+  disable_read         = true
+  disable_delete       = true
+  data_json            = "{}"
   depends_on = [
     vault_database_secret_backend_connection.this
   ]
